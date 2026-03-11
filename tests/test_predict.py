@@ -1,64 +1,62 @@
+# tests/test_predict.py
 import requests
 
-BASE_URL = 'http://127.0.0.1:5000'
+BASE_URL = "http://localhost:8000"
 
-# -----------------------------
-# Test 1: Health check
-# -----------------------------
-print("Testing /health endpoint...")
-response = requests.get(BASE_URL + "/health")
-print("Status Code:", response.status_code)
-print("Response:", response.json())
-print()
+def test_health():
+    """Test the /health endpoint"""
+    response = requests.get(f"{BASE_URL}/health")
+    assert response.status_code == 200
+    json_data = response.json()
+    assert json_data["status"] == "healthy"
+    assert json_data["model_loaded"] is True
+    print("Health check passed!")
 
-# -----------------------------
-# Test 2: Model info
-# -----------------------------
-print("Testing /info endpoint...")
-response = requests.get(BASE_URL + "/info")
-print("Status Code:", response.status_code)
-print("Response:", response.json())
-print()
+def test_info():
+    """Test the /info endpoint"""
+    response = requests.get(f"{BASE_URL}/info")
+    assert response.status_code == 200
+    json_data = response.json()
 
-# -----------------------------
-# Test 3: Prediction
-# -----------------------------
-url = BASE_URL + "/predict"
+    assert "model_type" in json_data
+    assert "features_expected" in json_data
 
-# ----- Valid data -----
-print("Test with valid data")
-response = requests.post(url, json={
-    "lag_1": 149000,
-    "lag_2": 148500,
-    "lag_52": 140000
-})
-print(response.status_code)
-print(response.json())
-print()
+    expected_features = ["lag_1", "lag_2", "lag_52"]
+    assert json_data["features_expected"] == expected_features
 
-# ----- Missing feature -----
-print("Test with missing data")
-response = requests.post(url, json={
-    "lag_1": 149000,
-    "lag_2": 148500
-})
-print(response.status_code)
-print(response.json())
-print()
+    print("Info check passed!")
 
-# ----- Wrong type -----
-print("Test with wrong type")
-response = requests.post(url, json={
-    "lag_1": "not_a_number",
-    "lag_2": 148500,
-    "lag_52": 140000
-})
-print(response.status_code)
-print(response.json())
-print()
+def test_predict_valid():
+    """Test the /predict endpoint with valid data"""
+    test_data = {
+        "lag_1": 100000,
+        "lag_2": 95000,
+        "lag_52": 90000
+    }
 
-# ----- Empty request -----
-print("Test with empty request")
-response = requests.post(url, json={})
-print(response.status_code)
-print(response.json())
+    response = requests.post(f"{BASE_URL}/predict", json=test_data)
+
+    assert response.status_code == 200
+    json_data = response.json()
+
+    assert json_data["status"] == "success"
+    assert "prediction" in json_data
+
+    print(f"Prediction successful: {json_data['prediction']}")
+
+def test_predict_missing_feature():
+    """Test the /predict endpoint with missing features"""
+    test_data = {
+        "lag_1": 100000,
+        "lag_2": 95000
+    }
+
+    response = requests.post(f"{BASE_URL}/predict", json=test_data)
+
+    assert response.status_code == 422
+    json_data = response.json()
+
+    assert "detail" in json_data
+
+    print("Missing feature test passed!")
+    
