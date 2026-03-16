@@ -49,3 +49,4 @@ models/*.pkl
 # VS Code settings
 # -----------------------------
 .vscode/
+.vercel

@@ -46,6 +46,14 @@ class PredictionResponse(BaseModel):
     status: str
 
 # -------------------------------
+# Root endpoint
+# -------------------------------
+@app.get("/")
+def root():
+    """Root endpoint"""
+    return {"message": "ML Prediction API is running!"}
+
+# -------------------------------
 # Health check endpoint
 # -------------------------------
 @app.get("/health")
@@ -90,3 +98,4 @@ def predict(request: PredictionRequest):
         return PredictionResponse(prediction=float(prediction[0]), status="success")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+        
