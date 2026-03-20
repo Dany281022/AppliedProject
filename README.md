@@ -2,7 +2,7 @@
 AIE1014 — AI Applied Project Course
 
 ## Team
-- Dany (Developer)
+- Dany (MLOps Engineer)
 
 ## Project Description
 This application predicts weekly sales figures using a trained machine learning model
