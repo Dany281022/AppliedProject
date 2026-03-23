@@ -33,6 +33,10 @@ def health():
 def info():
     return {"model_type": type(model).__name__, "features_expected": ["lag_1", "lag_2", "lag_52"], "version": "1.0"}
 
+@app.get("/")
+def root():
+    return {"message": "API is running 🚀"}
+
 @app.post("/predict", response_model=PredictionResponse)
 def predict(request: PredictionRequest):
     try:
