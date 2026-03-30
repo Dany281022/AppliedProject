@@ -4,84 +4,103 @@ import time
 
 API_URL = "http://localhost:8000"
 
+VALID_DATA = {
+    "lag_1": 100.0,
+    "lag_2": 95.0,
+    "lag_4": 90.0,
+    "lag_8": 88.0,
+    "lag_12": 85.0,
+    "lag_26": 80.0,
+    "lag_52": 75.0,
+    "ma_4": 93.0,
+    "ma_12": 87.0,
+    "std_4": 5.0,
+    "weekofyear": 12,
+    "month": 3,
+    "year": 2026
+}
+
 def test_api_health():
-    """Test API is running"""
     response = requests.get(f"{API_URL}/health")
     assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
     print("✅ API health check passed")
 
-def test_prediction_valid():
-    """Test prediction with valid data"""
-    data = {
-        "lag_1": 100.0,
-        "lag_2": 95.0,
-        "lag_52": 88.0
-    }
-    response = requests.post(f"{API_URL}/predict", json=data)
-    assert response.status_code == 200
-    assert "prediction" in response.json()
-    print(f"✅ Valid prediction: {response.json()['prediction']}")
-
-def test_prediction_missing_field():
-    """Test prediction with missing field"""
-    data = {"lag_1": 100.0}  # Missing lag_2 and lag_52
-    response = requests.post(f"{API_URL}/predict", json=data)
-    assert response.status_code == 422
-    print("✅ Missing field handled correctly")
-
-def test_prediction_invalid_type():
-    """Test prediction with invalid data type"""
-    data = {"lag_1": "invalid", "lag_2": 95.0, "lag_52": 88.0}
-    response = requests.post(f"{API_URL}/predict", json=data)
-    assert response.status_code in [400, 422, 500]
-    print("✅ Invalid type handled correctly")
-
-def test_prediction_empty_request():
-    """Test prediction with empty request"""
-    response = requests.post(f"{API_URL}/predict", json={})
-    assert response.status_code == 422
-    print("✅ Empty request handled correctly")
-
-def test_prediction_minimum_values():
-    """Test prediction with minimum values"""
-    data = {"lag_1": 0.0, "lag_2": 0.0, "lag_52": 0.0}
-    response = requests.post(f"{API_URL}/predict", json=data)
-    assert response.status_code == 200
-    print("✅ Minimum values work")
-
-def test_prediction_large_values():
-    """Test prediction with large values"""
-    data = {"lag_1": 99999.0, "lag_2": 99999.0, "lag_52": 99999.0}
-    response = requests.post(f"{API_URL}/predict", json=data)
-    assert response.status_code == 200
-    print("✅ Large values work")
-
-def test_response_time():
-    """Test that response time is acceptable"""
-    data = {"lag_1": 100.0, "lag_2": 95.0, "lag_52": 88.0}
-    start = time.time()
-    response = requests.post(f"{API_URL}/predict", json=data)
-    elapsed = time.time() - start
-    assert elapsed < 5.0
-    print(f"✅ Response time: {elapsed:.2f}s")
-
 def test_api_info():
-    """Test /info endpoint"""
     response = requests.get(f"{API_URL}/info")
     assert response.status_code == 200
     data = response.json()
     assert "model_type" in data
     assert "features_expected" in data
-    print(f"✅ Model info: {data['model_type']}, features: {data['features_expected']}")
+    assert data["num_features"] == 13
+    print(f"✅ Model info: {data['model_type']}, features: {data['num_features']}")
+
+def test_prediction_valid():
+    response = requests.post(f"{API_URL}/predict", json=VALID_DATA)
+    assert response.status_code == 200
+    result = response.json()
+    assert "prediction" in result
+    assert "status" in result
+    assert "response_time_ms" in result
+    assert result["status"] == "success"
+    print(f"✅ Valid prediction: ${result['prediction']:,.2f} in {result['response_time_ms']}ms")
+
+def test_prediction_missing_field():
+    data = {"lag_1": 100.0, "lag_2": 95.0}
+    response = requests.post(f"{API_URL}/predict", json=data)
+    assert response.status_code == 422
+    print("✅ Missing fields handled correctly (422)")
+
+def test_prediction_invalid_type():
+    data = {**VALID_DATA, "lag_1": "invalid"}
+    response = requests.post(f"{API_URL}/predict", json=data)
+    assert response.status_code in [400, 422, 500]
+    print("✅ Invalid type handled correctly")
+
+def test_prediction_empty_request():
+    response = requests.post(f"{API_URL}/predict", json={})
+    assert response.status_code == 422
+    print("✅ Empty request handled correctly (422)")
+
+def test_prediction_minimum_values():
+    data = {**VALID_DATA, "lag_1": 0.0, "lag_2": 0.0, "lag_52": 0.0}
+    response = requests.post(f"{API_URL}/predict", json=data)
+    assert response.status_code == 200
+    print("✅ Minimum values work")
+
+def test_prediction_large_values():
+    data = {**VALID_DATA, "lag_1": 99999.0, "lag_2": 99999.0, "lag_52": 99999.0}
+    response = requests.post(f"{API_URL}/predict", json=data)
+    assert response.status_code == 200
+    print("✅ Large values work")
+
+def test_response_time():
+    start = time.time()
+    response = requests.post(f"{API_URL}/predict", json=VALID_DATA)
+    elapsed = time.time() - start
+    assert elapsed < 5.0
+    result = response.json()
+    model_time = result.get("response_time_ms", 0)
+    print(f"✅ Response time: {elapsed:.2f}s total | {model_time}ms model inference")
+
+def test_prediction_response_structure():
+    response = requests.post(f"{API_URL}/predict", json=VALID_DATA)
+    assert response.status_code == 200
+    result = response.json()
+    assert "prediction" in result
+    assert "status" in result
+    assert "response_time_ms" in result
+    assert result["status"] == "success"
+    print("✅ Response structure is correct")
 
 def run_all_tests():
-    """Run all integration tests"""
     print("\n" + "="*50)
     print("INTEGRATION TESTS - Weekly Sales Prediction")
     print("="*50 + "\n")
 
     tests = [
         test_api_health,
+        test_api_info,
         test_prediction_valid,
         test_prediction_missing_field,
         test_prediction_invalid_type,
@@ -89,7 +108,7 @@ def run_all_tests():
         test_prediction_minimum_values,
         test_prediction_large_values,
         test_response_time,
-        test_api_info,
+        test_prediction_response_structure,
     ]
 
     passed = 0
@@ -115,4 +134,3 @@ def run_all_tests():
 if __name__ == "__main__":
     success = run_all_tests()
     exit(0 if success else 1)
-    
