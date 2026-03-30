@@ -2,7 +2,9 @@
 import requests
 import time
 
-API_URL = "http://localhost:8000"
+# Use 127.0.0.1 instead of localhost to avoid Windows DNS resolution
+# overhead (~2s delay caused by IPv6 fallback on Windows systems)
+API_URL = "http://127.0.0.1:8000"
 
 VALID_DATA = {
     "lag_1": 100.0,
@@ -40,6 +42,7 @@ def test_prediction_valid():
     assert response.status_code == 200
     result = response.json()
     assert "prediction" in result
+    assert "confidence" in result
     assert "status" in result
     assert "response_time_ms" in result
     assert result["status"] == "success"
@@ -75,23 +78,30 @@ def test_prediction_large_values():
     print("✅ Large values work")
 
 def test_response_time():
-    start = time.time()
-    response = requests.post(f"{API_URL}/predict", json=VALID_DATA)
-    elapsed = time.time() - start
-    assert elapsed < 5.0
+    # First call may be slow due to Windows DNS — measure subsequent calls
+    requests.post(f"{API_URL}/predict", json=VALID_DATA)  # warm-up
+    times = []
+    for _ in range(5):
+        start = time.time()
+        response = requests.post(f"{API_URL}/predict", json=VALID_DATA)
+        elapsed = (time.time() - start) * 1000
+        times.append(elapsed)
+    avg_ms = sum(times) / len(times)
     result = response.json()
     model_time = result.get("response_time_ms", 0)
-    print(f"✅ Response time: {elapsed:.2f}s total | {model_time}ms model inference")
+    assert avg_ms < 1000, f"Average response time {avg_ms:.1f}ms exceeds 1000ms target"
+    print(f"✅ Avg response time: {avg_ms:.1f}ms | model inference: {model_time}ms")
 
 def test_prediction_response_structure():
     response = requests.post(f"{API_URL}/predict", json=VALID_DATA)
     assert response.status_code == 200
     result = response.json()
     assert "prediction" in result
+    assert "confidence" in result
     assert "status" in result
     assert "response_time_ms" in result
     assert result["status"] == "success"
-    print("✅ Response structure is correct")
+    print("✅ Response structure is correct (prediction, confidence, status, response_time_ms)")
 
 def run_all_tests():
     print("\n" + "="*50)

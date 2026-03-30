@@ -2,7 +2,7 @@
 AIE1014 — AI Applied Project Course | Milestone 4
 
 ## What This Project Does
-This application predicts weekly sales figures for retail business managers using a RandomForestRegressor model trained on historical lag features. Users enter three lag values (previous week, 2 weeks ago, and 1 year ago) through a web interface and receive instant sales forecasts to support inventory and staffing decisions.
+This application predicts weekly sales figures for retail business managers using a RandomForestRegressor model trained on 13 historical lag and moving average features. Users enter sales history values through a web interface and receive instant sales forecasts with a prediction interval to support inventory and staffing decisions.
 
 **Stakeholder:** Retail Business Manager  
 **GitHub:** https://github.com/Dany281022/AppliedProject
@@ -47,8 +47,8 @@ pip install -r requirements.txt
 cd api
 python app.py
 ```
-API runs at: http://localhost:8000  
-Interactive docs at: http://localhost:8000/docs
+API runs at: http://127.0.0.1:8000  
+Interactive docs at: http://127.0.0.1:8000/docs
 
 ### Step 2 — Start the UI (Terminal 2)
 ```bash
@@ -61,20 +61,20 @@ App runs at: http://localhost:8501
 ```bash
 python tests/test_integration.py
 ```
-Expected output: 9 passed, 0 failed
+Expected output: 10 passed, 0 failed
 
 ## Project Structure
 ```
 Millestone04_TeamDany/
 ├── api/
 │   ├── app.py               ← FastAPI server
-│   ├── model.pkl            ← Trained RandomForestRegressor
+│   ├── model.pkl            ← Trained RandomForestRegressor (13 features)
 │   └── requirements.txt
 ├── ui/
-│   ├── app_ui.py            ← Streamlit interface
+│   ├── app_ui.py            ← Streamlit interface with dashboard
 │   └── requirements.txt
 ├── tests/
-│   ├── test_integration.py  ← Integration tests (9/9 passing)
+│   ├── test_integration.py  ← Integration tests (10/10 passing)
 │   └── test_results.txt     ← Test output
 ├── docs/
 │   └── TeamDany_Milestone4_Report.pdf
@@ -84,35 +84,51 @@ Millestone04_TeamDany/
 
 ## API Endpoints
 
-| Endpoint | Method | Description      |
-|----------|--------|------------------|
-| /health  | GET    | Health check     |
-| /predict | POST   | Make a prediction|
-| /info    | GET    | Model information|
+| Endpoint | Method | Description       |
+|----------|--------|-------------------|
+| /health  | GET    | Health check      |
+| /predict | POST   | Make a prediction |
+| /info    | GET    | Model information |
 
 ### Example Request
 ```json
 POST /predict
 {
-  "lag_1": 100.0,
-  "lag_2": 95.0,
-  "lag_52": 88.0
+  "lag_1": 40000000.0,
+  "lag_2": 39000000.0,
+  "lag_4": 38000000.0,
+  "lag_8": 37000000.0,
+  "lag_12": 36000000.0,
+  "lag_26": 35000000.0,
+  "lag_52": 34000000.0,
+  "ma_4": 38500000.0,
+  "ma_12": 37000000.0,
+  "std_4": 500000.0,
+  "weekofyear": 13,
+  "month": 3,
+  "year": 2026
 }
 ```
 
 ### Example Response
 ```json
 {
-  "prediction": 45779299.68,
-  "status": "success"
+  "prediction": 43560477.77,
+  "confidence": "USD 39,204,430 - USD 47,916,526 (+-10% interval)",
+  "status": "success",
+  "response_time_ms": 13.1
 }
 ```
 
 ## Model Information
 - **Algorithm:** RandomForestRegressor
 - **Target:** Weekly sales figures (float)
-- **Features:** lag_1 (previous week), lag_2 (2 weeks ago), lag_52 (1 year ago)
-- **Tests:** 9/9 integration tests passing, response time ~2s
+- **Features:** 13 (lag_1, lag_2, lag_4, lag_8, lag_12, lag_26, lag_52, ma_4, ma_12, std_4, weekofyear, month, year)
+- **RMSE:** $2,034,160
+- **MAE:** $1,472,779
+- **R2 Score:** 0.3025
+- **Tests:** 10/10 integration tests passing
+- **Average response time:** 13.1ms (model inference: ~9ms)
 
 ## Error Codes
 | Code | Meaning |
@@ -128,16 +144,18 @@ POST /predict
 | Module not found | Run `pip install -r requirements.txt` |
 | Cannot connect to API | Make sure the API is running in Terminal 1 |
 | Model file not found | Ensure `model.pkl` is in the `api/` directory |
+| Slow response (~2s) | Use `http://127.0.0.1:8000` instead of `localhost` |
 
 ## Known Issues & Limitations
 - UI requires the API running in a separate terminal before launch
-- Model trained on only 3 lag features — cannot capture promotions or seasonality
+- Model trained on Walmart dataset — may not generalize to all retail contexts
 - No authentication — API is open on localhost only
+- R2 score of 0.30 indicates moderate fit — predictions are directional estimates
 
 ## Future Improvements
 - Deploy API to Render and UI to Streamlit Cloud for public access
-- Add more features (promotions, holidays, store location)
-- Add prediction history chart to the UI
+- Add more features (promotions, holidays, store location) to improve R2
+- Connect to a live database to auto-fill lag values
 
 ---
 AIE1014 — AI Applied Project Course | Team Dany | Winter 2026
