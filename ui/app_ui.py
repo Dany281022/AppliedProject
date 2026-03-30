@@ -13,18 +13,13 @@ from datetime import datetime
 # overhead (~2s delay caused by IPv6 fallback on Windows systems)
 API_URL = "http://127.0.0.1:8000"
 
-# Page config must be the first Streamlit command —
-# calling any other st.* before this raises a StreamlitAPIException
 st.set_page_config(page_title="Weekly Sales Forecaster", page_icon="📈", layout="wide")
 
-# ─── Sidebar ───────────────────────────────────────────────────────────────────
-
+# ─── Sidebar ───────────────────────────────────────────────
 st.sidebar.title("📈 Weekly Sales Forecaster")
 st.sidebar.markdown("**Team Dany | AIE1014**")
 st.sidebar.divider()
 
-# Check API health on every page load so the user knows immediately
-# whether the backend is reachable before they submit a prediction
 try:
     health = requests.get(f"{API_URL}/health", timeout=5)
     if health.status_code == 200:
@@ -32,14 +27,11 @@ try:
     else:
         st.sidebar.error("❌ API Error")
 except:
-    # Show the exact command needed to start the API — reduces confusion
     st.sidebar.error("❌ API Offline")
     st.sidebar.code("cd api && python app.py", language="bash")
 
 st.sidebar.divider()
 
-# Fetch model metadata dynamically from /info so the sidebar always reflects
-# the current deployed model without requiring a UI code change
 try:
     info = requests.get(f"{API_URL}/info", timeout=5)
     if info.status_code == 200:
@@ -58,29 +50,22 @@ st.sidebar.divider()
 st.sidebar.markdown("**Stakeholder:** Retail Business Manager")
 st.sidebar.caption("Built with ❤️ by Team Dany")
 
-# ─── Main Title ────────────────────────────────────────────────────────────────
-
+# ─── Main Title ────────────────────────────────────────────
 st.title("📈 Weekly Sales Forecaster — Team Dany")
 st.write("Predict next week's retail sales using historical lag features and moving averages.")
 st.divider()
 
-# ─── Tabs ──────────────────────────────────────────────────────────────────────
-
-# Three tabs: prediction form, model dashboard, prediction history table
+# ─── Tabs ──────────────────────────────────────────────────
 tab1, tab2, tab3 = st.tabs(["🔮 Prediction", "📊 Dashboard", "📋 History"])
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
 # TAB 1 — PREDICTION
-# ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
 with tab1:
     st.markdown("### 📝 Enter Your Sales Data")
 
-    # Auto-fill date fields with today's values so the user does not need
-    # to look up the current week number or month manually
     now = datetime.now()
 
-    # st.form batches all inputs into a single submission —
-    # prevents the API from being called on every widget interaction
     with st.form("prediction_form"):
         st.markdown("#### Lag Features")
         col1, col2 = st.columns(2)
@@ -101,8 +86,6 @@ with tab1:
         with col4:
             ma_12 = st.number_input("MA 12 weeks ($)", min_value=0.0, value=100.0)
         with col5:
-            # std_4 measures sales volatility over the past 4 weeks —
-            # higher values indicate less stable recent sales patterns
             std_4 = st.number_input("Std Dev 4 weeks", min_value=0.0, value=10.0)
 
         st.markdown("#### Date Features (Auto-filled)")
@@ -117,8 +100,6 @@ with tab1:
         submitted = st.form_submit_button("🔮 Get Prediction", use_container_width=True)
 
     if submitted:
-        # Show a spinner during the API call so the user knows the system
-        # is processing — important given the network overhead on Windows
         with st.spinner("Generating sales forecast..."):
             try:
                 response = requests.post(
@@ -136,14 +117,10 @@ with tab1:
                     prediction = result['prediction']
                     confidence = result.get('confidence', 'N/A')
                     resp_time  = result.get('response_time_ms', 'N/A')
-
-                    # Format for the stakeholder: currency, units, context
-                    formatted = f"${prediction:,.2f}"
+                    formatted  = f"${prediction:,.2f}"
 
                     st.success(f"✅ Predicted Next-Week Sales: **{formatted}**")
 
-                    # Contextual interpretation — only shown when lag_1 is
-                    # a realistic sales value (> $1M) to avoid absurd percentages
                     if lag_1 > 1_000_000:
                         pct_change = ((prediction - lag_1) / lag_1) * 100
                         direction  = "above" if pct_change >= 0 else "below"
@@ -153,7 +130,6 @@ with tab1:
                             f"Use this to adjust inventory and staffing for next week."
                         )
 
-                    # Confidence interval from the API
                     st.markdown(f"**Prediction Interval:** {confidence}")
 
                     col1, col2, col3, col4 = st.columns(4)
@@ -166,7 +142,6 @@ with tab1:
                     with col4:
                         st.metric("Response Time", f"{resp_time} ms")
 
-                    # Persist prediction in session_state history for Tab 3
                     if "history" not in st.session_state:
                         st.session_state.history = []
                     st.session_state.history.append({
@@ -183,18 +158,118 @@ with tab1:
                 else:
                     st.error(f"❌ Error: {response.json().get('detail', 'Unknown error')}")
 
-            # Catch connection errors separately so the message is actionable
             except requests.exceptions.ConnectionError:
                 st.error("❌ Cannot connect to API. Make sure the server is running!")
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
 # TAB 2 — DASHBOARD
-# ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════
 with tab2:
     st.markdown("### 📊 Model Performance Dashboard")
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("R2 Score", "0.3025", help="Higher is better (max 1.0)")
+        st.metric("R2 Score", "0.3025",    help="Higher is better (max 1.0)")
     with col2:
-        st.metric("RMSE", "$2,034
+        st.metric("RMSE",     "$2,034,160", help="Root Mean Squared Error in dollars")
+    with col3:
+        st.metric("MAE",      "$1,472,779", help="Mean Absolute Error in dollars")
+    with col4:
+        st.metric("Features", "13",         help="Number of input features")
+
+    st.divider()
+
+    # Feature importance — real values fetched from API
+    st.markdown("#### 🎯 Feature Importance")
+    try:
+        info_resp = requests.get(f"{API_URL}/info", timeout=5)
+        if info_resp.status_code == 200:
+            info_data   = info_resp.json()
+            features    = info_data['features_expected']
+            importances = info_data['feature_importances']  # real values from model
+
+            df_imp = pd.DataFrame({
+                "Feature":    features,
+                "Importance": importances
+            }).sort_values("Importance", ascending=True)
+
+            fig_imp = px.bar(
+                df_imp, x="Importance", y="Feature", orientation="h",
+                title="Feature Importance — Random Forest",
+                color="Importance", color_continuous_scale="blues",
+                text="Importance"
+            )
+            fig_imp.update_traces(texttemplate='%{text:.3f}', textposition='outside')
+            fig_imp.update_layout(showlegend=False, height=500)
+            st.plotly_chart(fig_imp, use_container_width=True)
+    except Exception:
+        st.info("Feature importance will appear after API is connected.")
+
+    st.divider()
+
+    st.markdown("#### 📈 Prediction History Chart")
+    if "history" in st.session_state and len(st.session_state.history) > 0:
+        df_hist  = pd.DataFrame(st.session_state.history)
+        fig_hist = px.line(
+            df_hist, x="Timestamp", y="Prediction ($)",
+            title="Sales Predictions Over Time",
+            markers=True, line_shape="spline"
+        )
+        fig_hist.update_traces(line_color="#1f77b4", marker_size=8)
+        fig_hist.update_layout(xaxis_title="Time", yaxis_title="Predicted Sales ($)", height=400)
+        st.plotly_chart(fig_hist, use_container_width=True)
+    else:
+        st.info("Make predictions in the Prediction tab to see the chart here.")
+
+    st.divider()
+
+    st.markdown("#### ⚡ Response Time History")
+    if "history" in st.session_state and len(st.session_state.history) > 0:
+        df_hist = pd.DataFrame(st.session_state.history)
+        if "Response Time (ms)" in df_hist.columns:
+            fig_rt = px.bar(
+                df_hist, x="Timestamp", y="Response Time (ms)",
+                title="API Response Time per Prediction (ms)",
+                color="Response Time (ms)", color_continuous_scale="reds"
+            )
+            fig_rt.add_hline(y=1000, line_dash="dash", line_color="red",
+                             annotation_text="Target < 1000ms")
+            fig_rt.update_layout(height=350)
+            st.plotly_chart(fig_rt, use_container_width=True)
+    else:
+        st.info("Make predictions to see response time chart.")
+
+# ══════════════════════════════════════════════════════════
+# TAB 3 — HISTORY
+# ══════════════════════════════════════════════════════════
+with tab3:
+    st.markdown("### 📋 Prediction History")
+
+    if "history" in st.session_state and len(st.session_state.history) > 0:
+        df_hist = pd.DataFrame(st.session_state.history)
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Predictions", len(df_hist))
+        with col2:
+            st.metric("Avg Forecast", f"${df_hist['Prediction ($)'].mean():,.2f}")
+        with col3:
+            st.metric("Max Forecast", f"${df_hist['Prediction ($)'].max():,.2f}")
+        with col4:
+            st.metric("Min Forecast", f"${df_hist['Prediction ($)'].min():,.2f}")
+
+        st.dataframe(df_hist, use_container_width=True)
+
+        csv = df_hist.to_csv(index=False)
+        st.download_button(
+            label="📥 Download History as CSV",
+            data=csv,
+            file_name="predictions_history.csv",
+            mime="text/csv"
+        )
+
+        if st.button("🗑️ Clear History"):
+            st.session_state.history = []
+            st.rerun()
+    else:
+        st.info("No predictions yet. Go to the Prediction tab to get started!")

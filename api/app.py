@@ -46,8 +46,6 @@ class PredictionRequest(BaseModel):
 
 class PredictionResponse(BaseModel):
     prediction: float
-    # Confidence is not applicable for regression models.
-    # We return a prediction interval range as a meaningful substitute.
     confidence: str
     status: str
     response_time_ms: float
@@ -65,6 +63,7 @@ def info():
     return {
         "model_type": type(model).__name__,
         "features_expected": model.feature_names_in_.tolist(),
+        "feature_importances": model.feature_importances_.tolist(),
         "num_features": len(model.feature_names_in_),
         "version": "1.0",
         "confidence_note": "Confidence intervals are not standard for regression. A +/- 10% prediction range is returned instead.",
@@ -80,7 +79,6 @@ def predict(request: PredictionRequest):
     try:
         start = time.time()
 
-        # Build DataFrame in the exact column order the model expects
         features = pd.DataFrame([{
             "lag_1": request.lag_1,
             "lag_2": request.lag_2,
@@ -100,12 +98,9 @@ def predict(request: PredictionRequest):
         prediction = model.predict(features)
         elapsed = round((time.time() - start) * 1000, 2)
 
-        # Compute a +/- 10% prediction interval as a proxy for confidence
         pred_value = float(prediction[0])
         lower = pred_value * 0.90
         upper = pred_value * 1.10
-
-        # Use plain ASCII characters to avoid encoding issues in JSON
         confidence_str = f"USD {lower:,.0f} - USD {upper:,.0f} (+-10% interval)"
 
         return PredictionResponse(
@@ -120,4 +115,3 @@ def predict(request: PredictionRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-    
